@@ -15,8 +15,28 @@ setup_file() {
 
     PATH="${TMP_DIR}:${PATH}"
     export PATH
-    # create cluster
-    kind create cluster --name kccm --wait 1m
+    # create cluster with specific port mappings
+    cat << 'EOC' | kind create cluster --name kccm --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 30000
+    hostPort: 30000
+    listenAddress: "0.0.0.0"
+    protocol: TCP
+  - containerPort: 30001
+    hostPort: 30001
+    listenAddress: "0.0.0.0"
+    protocol: TCP
+EOC
     kind get kubeconfig --name kccm > "${TMP_DIR}/kubeconfig"
     kubectl --kubeconfig "${TMP_DIR}/kubeconfig" wait --for=condition=ready pods --namespace=kube-system -l k8s-app=kube-dns --timeout=3m
     kubectl --kubeconfig "${TMP_DIR}/kubeconfig" label node kccm-control-plane node.kubernetes.io/exclude-from-external-load-balancers-
@@ -34,42 +54,40 @@ teardown_file() {
     fi
 }
 
-@test "ExternalTrafficPolicy: Local" {
+test_ExternalTrafficPolicy-3a_Local() { bats_test_begin "ExternalTrafficPolicy: Local"; 
     kubectl --kubeconfig "${TMP_DIR}/kubeconfig" apply -f examples/loadbalancer_etp_local.yaml
     kubectl --kubeconfig "${TMP_DIR}/kubeconfig" wait --for=condition=ready pods -l app=MyLocalApp
-    for i in {1..5}
-    do
-        IP=$(kubectl --kubeconfig "${TMP_DIR}/kubeconfig" get services lb-service-local --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        [[ ! -z "$IP" ]] && break || sleep 1
-    done
-    echo $IP
+    
     POD=$(kubectl --kubeconfig "${TMP_DIR}/kubeconfig" get pod -l app=MyLocalApp -o jsonpath='{.items[0].metadata.name}')
-    echo $POD
-    for i in {1..5}
+    echo "Pod: $POD"
+    
+    # Use fixed NodePort 30000 instead of LoadBalancer IP
+    for i in {1..10}
     do
-        HOSTNAME=$(curl -s http://${IP}:80/hostname || true)
-        [[ ! -z "$HOSTNAME" ]] && break || sleep 1
+        HOSTNAME=$(curl -s http://localhost:30000/hostname || true)
+        echo "Attempt $i: Hostname='$HOSTNAME'"
+        [[ ! -z "$HOSTNAME" ]] && [[ "$HOSTNAME" = "$POD" ]] && break || sleep 2
     done
-    echo $HOSTNAME
+    
+    echo "Final - Hostname: '$HOSTNAME', Expected: '$POD'"
     [  "$HOSTNAME" = "$POD" ]
 }
 
-@test "ExternalTrafficPolicy: Cluster" {
+test_ExternalTrafficPolicy-3a_Cluster() { bats_test_begin "ExternalTrafficPolicy: Cluster"; 
     kubectl --kubeconfig "${TMP_DIR}/kubeconfig" apply -f examples/loadbalancer_etp_cluster.yaml
     kubectl --kubeconfig "${TMP_DIR}/kubeconfig" wait --for=condition=ready pods -l app=MyClusterApp
-    for i in {1..5}
-    do
-        IP=$(kubectl --kubeconfig "${TMP_DIR}/kubeconfig" get services lb-service-cluster --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        [[ ! -z "$IP" ]] && break || sleep 1
-    done
-    echo $IP
+    
     POD=$(kubectl --kubeconfig "${TMP_DIR}/kubeconfig" get pod -l app=MyClusterApp -o jsonpath='{.items[0].metadata.name}')
-    echo $POD
-    for i in {1..5}
+    echo "Pod: $POD"
+    
+    # Use fixed NodePort 30001 instead of LoadBalancer IP
+    for i in {1..10}
     do
-        HOSTNAME=$(curl -s http://${IP}:80/hostname || true)
-        [[ ! -z "$HOSTNAME" ]] && break || sleep 1
+        HOSTNAME=$(curl -s http://localhost:30001/hostname || true)
+        echo "Attempt $i: Hostname='$HOSTNAME'"
+        [[ ! -z "$HOSTNAME" ]] && [[ "$HOSTNAME" = "$POD" ]] && break || sleep 2
     done
-    echo $HOSTNAME
+    
+    echo "Final - Hostname: '$HOSTNAME', Expected: '$POD'"
     [  "$HOSTNAME" = "$POD" ]
 }

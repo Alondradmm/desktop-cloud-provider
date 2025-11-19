@@ -1,6 +1,17 @@
 services:
   cloud-provider:
     build: .
-    network_mode: "${NET_MODE-host}"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - //var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - kind
+    environment:
+      - DDCP_DOCKER_NETWORK=kind
+      - DDCP_SKIP_LOADBALANCER_READINESS_CHECK=true
+    # (Opcional) nombre fijo para inspeccionar fácilmente
+    container_name: desktop-cloud-provider
+
+networks:
+  kind:
+    external: true
+    name: kind

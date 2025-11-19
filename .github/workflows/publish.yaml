@@ -30,4 +30,4 @@ jobs:
       -
         name: Build and push image
         run: |
-          docker buildx build --platform=linux/amd64,linux/arm64 --push --tag docker/desktop-cloud-provider-kind:${{ github.ref_name }} .
+          docker buildx build --platform=linux/amd64,linux/arm64 --push --tag alondradmm/desktop-cloud-provider:${{ github.ref_name }} .

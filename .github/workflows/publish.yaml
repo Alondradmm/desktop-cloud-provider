@@ -20,7 +20,7 @@ jobs:
       # Extraer el código fuente del repositorio
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - 
         name: Instalaccion Bats
         run: |

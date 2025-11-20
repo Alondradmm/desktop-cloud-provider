@@ -2,16 +2,22 @@
 name: publish
 
 on:
+  # Se ejecuta cuando se crea una nueva etiqueta
+  # o en cada push a la rama main
   push:
     branches:
       - main
     tags:
       - 'v*'
 
+# Cuerpo del flujo de trabajo
 jobs:
   publish:
+    # Entorno de ejecución
     runs-on: ubuntu-latest
+    # Pasos del flujo de trabajo
     steps:
+      # Extraer el código fuente del repositorio
       -
         name: Checkout
         uses: actions/checkout@v4
@@ -24,19 +30,29 @@ jobs:
         name: Run test
         run: |
           bats tests/testmd.bats
+      # Iniciar sesión en DockerHub
       -
         name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+      # Configurar QEMU y Docker Buildx para compilaciones multiplataforma
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      # Configurar Docker Buildx
+      # Permite crear imágenes Docker para múltiples arquitecturas
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      # Compilar y publicar la imagen Docker
+      # Etiquetada con el nombre de la etiqueta creada o con 'latest' si es un push a main
       -
         name: Build and push image
         run: |
-          docker buildx build --platform=linux/amd64,linux/arm64 --push --tag alondradmm/desktop-cloud-provider:${{ github.ref_name }} .
+          docker buildx build \
+            --platform=linux/amd64,linux/arm64 \
+            --push \
+            --tag alondradmm/desktop-cloud-provider:${{ github.ref_name }} \
+            .

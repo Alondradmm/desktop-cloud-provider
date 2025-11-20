@@ -35,5 +35,5 @@ spec:
     app: MyLocalApp
   ports:
     - protocol: TCP
-      port: 80 # 3001
+      port: 3001
       targetPort: 8080
